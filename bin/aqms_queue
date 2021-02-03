@@ -98,7 +98,12 @@ def main(pargs):
 
     if 'localhost' not in queue_conf['servers']:
         queue_conf['servers'].append('localhost')
-    aftershockThreshold = float(queue_conf['aftershock'])
+    if 'aftershock' in queue_conf:
+        aftershockThreshold = float(queue_conf['aftershock'])
+    else:
+        # if aftershock suppression is not in configuration file,
+        # set to 0 to disable aftershock suppression
+        aftershockThreshold = 0
     #
     # Turn this process into a daemon
     #
@@ -199,7 +204,7 @@ def main(pargs):
                     continue
 
                 # define aftershock zone if necessary
-                if event.get('mag') >= aftershockThreshold and aftershockThreshold > 0:
+                if aftershockThreshold > 0 and event.get('mag') >= aftershockThreshold:
                     # let's attempt to define a new aftershock zone
                     logger.warning("Event is over M%3.1f, do aftershock define for event %s" %  (aftershockThreshold, eventID))
                     returnVal = aftershockDBobj.defineAftershockZone(aftershockDict)
