@@ -289,7 +289,6 @@ def _get_eqinfo_postgres(eventid, config, logger):
         query = """SELECT o.lat, o.lon, n.magnitude, o.depth,
                  TrueTime.getStringf(o.datetime),
                  m.rake1, m.rake2, 
-                 wheres.point('town',o.lat,o.lon,o.depth),
                  wheres.locale_by_type2(o.lat,o.lon,o.depth,'town') 
                  FROM netmag n, origin o, event e 
                  LEFT OUTER JOIN mec m ON e.prefmec = m.mecid 
@@ -317,7 +316,7 @@ def _get_eqinfo_postgres(eventid, config, logger):
             con.close()
             break
         try:
-            [(lat,lon,mag,depth,date,rake1,rake2,(dist,az,town),place)] = cursor.fetchall()
+            [(lat,lon,mag,depth,date,rake1,rake2,place)] = cursor.fetchall()
         except psycopg2.ProgrammingError as err:
             logger.warn('Error: %s' % err)
             cursor.close()
@@ -332,20 +331,9 @@ def _get_eqinfo_postgres(eventid, config, logger):
         logger.warning('Could not retrieve event from database(s)')
         return None
 
-#    try:
-#        dt = datetime.strptime(date.getvalue(), constants.TIMEFMT)
-#    except ValueError:
-#        try:
-#            dt = datetime.strptime(date.getvalue(), constants.ALT_TIMEFMT)
-#        except ValueError:
-#            logger.error("Can't parse input time %s" % event['time'])
-#            return
-
     dt = datetime.strptime(date, '%Y/%m/%d %H:%M:%S.%f')
     date = dt.strftime(constants.TIMEFMT) # changed source of TIMEFMT to proper local library - GG
     dt = datetime.strptime(date, constants.TIMEFMT)
-
-    distmi = float(dist) * 0.62137
 
     mech = 'ALL'
     if rake1 is not None and rake2 is not None:  # RAKE VALUES ARE NOT ALWAYS PRESENT FOR EVENTS, DEFAULTING TO-> mech = 'ALL' - GG
@@ -377,8 +365,6 @@ def _get_eqinfo_postgres(eventid, config, logger):
                 (rake1 >= -225 and rake1 <= -135)):
             mech = 'SS'
 
-    loc = place
-
     event = {'id': eventid,
              'netid': config['netid'],
              'network': config['network'],
@@ -387,7 +373,7 @@ def _get_eqinfo_postgres(eventid, config, logger):
              'depth': round(float(depth), 1),
              'mag': round(float(mag), 1),
              'time': dt,
-             'locstring': loc,
+             'locstring': place,
              'mech': mech,
              'alt_eventids': "NONE"}  # ADDED alt_eventids key because sm_queue is expecting and attempts to access this dict value - GG
 
