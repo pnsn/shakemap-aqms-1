@@ -274,7 +274,7 @@ def _get_eqinfo_postgres(eventid, config, logger):
                                     password=db['password'],
                                     host=db['host'],
                                     port=db['port'],
-                                    dbname=db['sid']
+                                    dbname=db['sid'])
             # autocommit to prevent "Idle in Transaction" issues
             con.set_session(readonly=True, autocommit=True)
         except psycopg2.DatabaseError as err:
