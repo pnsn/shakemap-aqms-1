@@ -23,6 +23,48 @@ from shakemap.utils.config import get_config_paths, config_error
 from shakelib.rupture import constants  # added by GG
 import shakemap.utils.queue as queue
 
+def get_connection(db_config, logger):
+    """Return connection to database"""
+    
+    if not db_config.has_key('driver'):
+        raise ValueError('driver key missing from %s' % db_config)
+ 
+    if db_config['driver'] == "oracle":
+
+            dsn_tns = cx_Oracle.makedsn(db_config['host'], db_config['port'],
+                                        sid=db_config['sid'])
+            try:
+                con = cx_Oracle.connect(user=db_config['user'],
+                                        password=db_config['password'],
+                                        dsn=dsn_tns)
+                return con
+            except cx_Oracle.DatabaseError as err:
+                logger.warn('Error connecting to database: %s' % dsn_tns)
+                logger.warn('Error: %s' % err)
+                continue
+
+    elif db_config['driver'] == "postgres":
+
+        try:
+            con = psycopg2.connect(user=db_config['user'],
+                                    password=db_config['password'],
+                                    host=db_config['host'],
+                                    port=db_config['port'],
+                                    dbname=db_config['sid'])
+            # autocommit to prevent "Idle in Transaction" issues
+            con.set_session(readonly=True, autocommit=True)
+            return con
+        except psycopg2.DatabaseError as err:
+            logger.warn('Error connecting to database: %s on %s' % (db_config['sid'],db_config['host']))
+            logger.warn('Error: %s' % err)
+            continue
+
+    else:
+        raise ValueError('unknown driver %s (only postgres or oracle allowed)'
+                         % db_config['driver'])
+    # should never get here
+    return None
+
 def dataframe_to_xml(df, xmlfile, reference=None):
     """Write a dataframe to ShakeMap XML format.
 
@@ -296,18 +338,6 @@ def _get_eqinfo_postgres(eventid, config, logger):
                  AND e.selectflag = 1 
                  AND o.orid = e.prefor 
                  AND n.magid = e.prefmag"""
-        #lat = cursor.var(cx_Oracle.NUMBER)
-        #lon = cursor.var(cx_Oracle.NUMBER)
-        #mag = cursor.var(cx_Oracle.NUMBER)
-        #depth = cursor.var(cx_Oracle.NUMBER)
-        #date = cursor.var(cx_Oracle.STRING)
-        #rake1 = cursor.var(cx_Oracle.NUMBER)
-        #rake2 = cursor.var(cx_Oracle.NUMBER)
-        #dist = cursor.var(cx_Oracle.NUMBER)
-        #az = cursor.var(cx_Oracle.NUMBER)
-        #elev = cursor.var(cx_Oracle.NUMBER)
-        #place = cursor.var(cx_Oracle.STRING)
-        #direction = cursor.var(cx_Oracle.STRING)
         try:
             cursor.execute(query, {'evid': eventid})
         except psycopg2.DatabaseError as err:
@@ -373,7 +403,7 @@ def _get_eqinfo_postgres(eventid, config, logger):
              'depth': round(float(depth), 1),
              'mag': round(float(mag), 1),
              'time': dt,
-             'locstring': place,
+             'locstring': place.strip(),
              'mech': mech,
              'alt_eventids': "NONE"}  # ADDED alt_eventids key because sm_queue is expecting and attempts to access this dict value - GG
 

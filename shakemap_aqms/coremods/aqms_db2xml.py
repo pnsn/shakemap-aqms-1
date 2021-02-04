@@ -5,12 +5,17 @@ import os.path
 # Third party imports
 import cx_Oracle
 import pandas as pd
+try:
+    import psycopg2
+except Exception as e:
+    print("postgresql not enabled")
 
 # local imports
 from shakemap.coremods.base import CoreModule
 from shakemap.utils.config import get_config_paths
 from shakemap_aqms.util import get_aqms_config
 from shakemap_aqms.util import dataframe_to_xml
+from shakemap_aqms.util import get_connection
 from shakelib.rupture.origin import Origin
 
 
@@ -50,17 +55,22 @@ class AQMSDb2XMLModule(CoreModule):
         success = False
         for dbname in sorted(config['dbs'].keys()):
             db = config['dbs'][dbname]
-            dsn_tns = cx_Oracle.makedsn(db['host'], db['port'],
-                                        sid=db['sid'])
             try:
-                con = cx_Oracle.connect(user=db['user'],
-                                        password=db['password'],
-                                        dsn=dsn_tns)
-            except cx_Oracle.DatabaseError as err:
+                # get_connection needs db['driver'] to be "oracle" or "postgres"
+                con = get_connection(db, logger)
+            except Exception as err:
                 self.logger.warn('Error connecting to database: %s' % dbname)
                 self.logger.warn('Error: %s' % err)
-                continue
-            cursor = con.cursor()
+                # try next dbname
+                break
+
+            try:
+                cursor = con.cursor()
+            except Exception as err:
+                # this should not happen, so pass on to calling program
+                self.logger.warn('Error: cannot create cursor to get metadata, 
+                                  null connection?')
+                raise err
 
             query = ("SELECT d.description, c.net, c.sta, c.seedchan, "
                      "c.location, c.lat, c.lon, c.elev, s.staname "
@@ -72,7 +82,7 @@ class AQMSDb2XMLModule(CoreModule):
                      "AND s.net_id = d.id")
             try:
                 cursor.execute(query, {'evtime': evtime})
-            except cx_Oracle.DatabaseError as err:
+            except Exception as err:
                 self.logger.warn('Error: %s' % err)
                 cursor.close()
                 con.close()
@@ -114,7 +124,7 @@ class AQMSDb2XMLModule(CoreModule):
         stalocdescr = {}
         try:
             cursor.execute('select sta, net, locdescr from stamapping')
-        except cx_Oracle.DatabaseError as err:
+        except Exception as err:
             self.logger.warn('Warning: couldnt retrieve stamapping: %s' % err)
         else:
             for line in cursor:
@@ -160,11 +170,18 @@ class AQMSDb2XMLModule(CoreModule):
                     cdict['netdesc'] = netcode[net]
                 else:
                     try:
+                        # oracle syntax
                         cursor.execute('select d.description '
                                        'from d_abbreviation d, station_data s '
                                        'where s.net = :net '
                                        'and s.net_id = d.id', {'net': net})
-                    except cx_Oracle.DatabaseError as err:
+                    except psycopg2.DatabaseError:
+                        # postgres syntax
+                        cursor.execute("""select d.description 
+                                       from d_abbreviation d, station_data s
+                                       where s.net = %(net)s
+                                       and s.net_id = d.id""", {'net': net})
+                    except Exception as err:
                         self.logger.warn(
                                 'Error retrieving net description: %s' % err)
                         netdesc = ['Unknown']
@@ -216,19 +233,23 @@ class AQMSDb2XMLModule(CoreModule):
                    'lon', 'netid', 'flag', 'name', 'loc', 'source')
         for dbname in sorted(config['dbs'].keys()):
             db = config['dbs'][dbname]
-            dsn_tns = cx_Oracle.makedsn(db['host'], db['port'],
-                                        sid=db['sid'])
+            
             try:
-                con = cx_Oracle.connect(user=db['user'],
-                                        password=db['password'],
-                                        dsn=dsn_tns)
-            except cx_Oracle.DatabaseError as err:
+                con = get_connection(db, logger)
+            except Exception as err:
                 self.logger.warn('Error connecting to database: %s' % dbname)
                 self.logger.warn('Error: %s' % err)
-                continue
-            cursor = con.cursor()
+                # try next dbname
+                break
 
-            query = ("WITH q1 AS ("
+            try:
+                cursor = con.cursor()
+            except Exception as err:
+                # should never happen
+                self.logger.warn('Error: cannot create cursor to retrieve amps, null connection?')
+                raise err
+
+            ora_query = ("WITH q1 AS ("
                      "SELECT a.net, a.sta, a.seedchan, a.location, "
                      "a.amplitude, a.amptype, a.cflag, a.quality, "
                      "a.units, a.lddate "
@@ -246,12 +267,36 @@ class AQMSDb2XMLModule(CoreModule):
                      "amplitude, amptype, cflag, quality, units "
                      "FROM q1 "
                      "ORDER BY net, sta, seedchan, location, amptype")
+            pg_query = """WITH q1 AS (
+                     SELECT a.net, a.sta, a.seedchan, a.location, 
+                     a.amplitude, a.amptype, a.cflag, a.quality, 
+                     a.units, a.lddate 
+                     FROM amp a, assocevampset asoc, ampset s 
+                     WHERE asoc.evid = %(evid)s
+                     AND asoc.ampsetid = s.ampsetid AND asoc.isvalid = 1 
+                     AND asoc.ampsettype = 'sm' 
+                     AND s.ampid  = a.ampid 
+                     AND a.amptype IN ('PGA', 'PGV', 'SP.3', 'SP1.0', 
+                     'SP3.0') 
+                     ORDER BY a.net, a.sta, a.seedchan, a.location, 
+                     a.amptype, a.lddate desc 
+                     ) 
+                     SELECT UNIQUE net, sta, seedchan, location, 
+                     amplitude, amptype, cflag, quality, units 
+                     FROM q1 
+                     ORDER BY net, sta, seedchan, location, amptype"""
+
+            if db['driver'] == "oracle":
+                query = ora_query
+            else:
+                query = pg_query
 
             try:
                 cursor.execute(query, {'evid': self._eventid})
-            except cx_Oracle.DatabaseError as err:
+            except Exception as err:
                 self.logger.warn('Error: amp query failed: %s' % err)
-                continue
+                # try next dbname
+                break
 
             ampdata = {}
             amprows = []
