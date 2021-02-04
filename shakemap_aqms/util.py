@@ -317,7 +317,7 @@ def _get_eqinfo_postgres(eventid, config, logger):
             con.close()
             break
         try:
-            [(lat,lon,mag,depth,date,rake1,rake2,dist,az,town,place)] = cursor.fetchall()
+            [(lat,lon,mag,depth,date,rake1,rake2,(dist,az,town),place)] = cursor.fetchall()
         except psycopg2.ProgrammingError as err:
             logger.warn('Error: %s' % err)
             cursor.close()
