@@ -232,7 +232,7 @@ def get_eqinfo(eventid, config, logger):
         elif config['dbs'][dbname]['driver'] == "postgres":
             event = _get_eqinfo_postgres(eventid, config, logger)
         else:
-            logger.error("Error: specify driver (oracle or postgres) in 
+            logger.error("Error: specify driver (oracle or postgres) in \
                           config file")
         if event:
             success = True
