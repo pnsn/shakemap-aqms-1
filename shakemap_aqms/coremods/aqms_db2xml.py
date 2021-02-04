@@ -68,7 +68,7 @@ class AQMSDb2XMLModule(CoreModule):
                 cursor = con.cursor()
             except Exception as err:
                 # this should not happen, so pass on to calling program
-                self.logger.warn('Error: cannot create cursor to get metadata, 
+                self.logger.warn('Error: cannot create cursor to get metadata, \
                                   null connection?')
                 raise err
 
