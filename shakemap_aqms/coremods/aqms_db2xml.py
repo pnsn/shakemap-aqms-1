@@ -47,7 +47,7 @@ class AQMSDb2XMLModule(CoreModule):
             raise FileNotFoundError('%s does not exist.' % datafile)
 
         origin = Origin.fromFile(datafile)
-        if origin['netid'].lower() in self._eventid:
+        if origin.netid.lower() in self._eventid:
             # strip off the netid so the event ID can be found in AQMS db
             aqms_eventid = self._eventid[2:]
         else:
