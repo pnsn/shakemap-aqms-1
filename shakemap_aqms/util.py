@@ -26,7 +26,7 @@ import shakemap.utils.queue as queue
 def get_connection(db_config, logger):
     """Return connection to database"""
     
-    if not db_config.has_option('driver'):
+    if 'driver' not in db_config:
         raise ValueError('driver key missing from %s' % db_config)
  
     if db_config['driver'] == "oracle":
