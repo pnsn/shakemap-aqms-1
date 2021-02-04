@@ -72,7 +72,7 @@ class AQMSDb2XMLModule(CoreModule):
                                   null connection?')
                 raise err
 
-            query = ("SELECT d.description, c.net, c.sta, c.seedchan, "
+            ora_query = ("SELECT d.description, c.net, c.sta, c.seedchan, "
                      "c.location, c.lat, c.lon, c.elev, s.staname "
                      "FROM channel_data c, station_data s, "
                      "d_abbreviation d "
@@ -80,6 +80,20 @@ class AQMSDb2XMLModule(CoreModule):
                      "c.ondate AND c.offdate "
                      "AND c.net = s.net AND c.sta = s.sta "
                      "AND s.net_id = d.id")
+            pg_query = """SELECT d.description, c.net, c.sta, c.seedchan, 
+                     c.location, c.lat, c.lon, c.elev, s.staname 
+                     FROM channel_data c, station_data s, 
+                     d_abbreviation d 
+                     WHERE TO_DATE(%(evtime)s, 'YYYY/MM/DD HH24MISS') BETWEEN 
+                     c.ondate AND c.offdate 
+                     AND c.net = s.net AND c.sta = s.sta 
+                     AND s.net_id = d.id"""
+
+            if db['driver'] == "oracle":
+                query = ora_query
+            else:
+                query = pg_query
+
             try:
                 cursor.execute(query, {'evtime': evtime})
             except Exception as err:
