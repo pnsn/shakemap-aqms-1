@@ -31,17 +31,17 @@ def get_connection(db_config, logger):
  
     if db_config['driver'] == "oracle":
 
-            dsn_tns = cx_Oracle.makedsn(db_config['host'], db_config['port'],
-                                        sid=db_config['sid'])
-            try:
-                con = cx_Oracle.connect(user=db_config['user'],
-                                        password=db_config['password'],
-                                        dsn=dsn_tns)
-                return con
-            except cx_Oracle.DatabaseError as err:
-                logger.warn('Error connecting to database: %s' % dsn_tns)
-                logger.warn('Error: %s' % err)
-                continue
+        dsn_tns = cx_Oracle.makedsn(db_config['host'], db_config['port'],
+                                    sid=db_config['sid'])
+        try:
+            con = cx_Oracle.connect(user=db_config['user'],
+                                    password=db_config['password'],
+                                    dsn=dsn_tns)
+            return con
+        except cx_Oracle.DatabaseError as err:
+            logger.warn('Error connecting to database: %s' % dsn_tns)
+            logger.warn('Error: %s' % err)
+            continue
 
     elif db_config['driver'] == "postgres":
 
