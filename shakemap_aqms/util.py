@@ -227,6 +227,192 @@ def get_eqinfo(eventid, config, logger):
     """
     success = False
     for dbname in sorted(config['dbs'].keys()):
+        if config['dbs'][dbname]['driver'] == "oracle":
+            event = _get_eqinfo_oracle(eventid, config, logger)
+        elif config['dbs'][dbname]['driver'] == "postgres":
+            event = _get_eqinfo_postgres(eventid, config, logger)
+        else:
+            logger.error("Error: specify driver (oracle or postgres) in 
+                          config file")
+        if event:
+            success = True
+            break
+
+    if not success:
+        logger.warning('Could not retrieve event from database(s)')
+        return None
+
+    return event
+
+def _get_eqinfo_postgres(eventid, config, logger):
+    """Get a dictionary of event information for the given eventid.
+
+    Args:
+        eventid (str): The event ID.
+        config (dict): The AQMS configuration dictionary.
+        logger (logger): The logger for this process.
+
+    Returns:
+        dict: None upon Error, else a dictionary containing the following keys:
+
+            - 'id' (str, "9108645")
+            - 'netid' (str, 'ci')
+            - 'network' (str, 'Southern California Seismic Network'')
+            - lat (float)
+            - lon (float)
+            - depth (float)
+            - mag (float)
+            - time (datetime object)
+            - locstring (str)
+            - mech (str)
+    """
+    success = False
+    for dbname in sorted(config['dbs'].keys()):
+        db = config['dbs'][dbname]
+        try:
+            con = psycopg2.connect(user=db['user'],
+                                    password=db['password'],
+                                    host=db['host'],
+                                    port=db['port'],
+                                    dbname=db['sid']
+            # autocommit to prevent "Idle in Transaction" issues
+            con.set_session(readonly=True, autocommit=True)
+        except psycopg2.DatabaseError as err:
+            logger.warn('Error connecting to database: %s' % dbname)
+            logger.warn('Error: %s' % err)
+            break
+        cursor = con.cursor()
+        query = """SELECT o.lat, o.lon, n.magnitude, o.depth,
+                 TrueTime.getStringf(o.datetime),
+                 m.rake1, m.rake2, 
+                 wheres.point('town',o.lat,o.lon,o.depth),
+                 wheres.locale_by_type2(o.lat,o.lon,o.depth,'town'),
+                 FROM netmag n, origin o, event e, 
+                 LEFT OUTER JOIN mec m ON e.prefmec = m.mecid 
+                 WHERE e.evid = %(evid)s  
+                 AND e.selectflag = 1 
+                 AND o.orid = e.prefor 
+                 AND n.magid = e.prefmag"""
+        #lat = cursor.var(cx_Oracle.NUMBER)
+        #lon = cursor.var(cx_Oracle.NUMBER)
+        #mag = cursor.var(cx_Oracle.NUMBER)
+        #depth = cursor.var(cx_Oracle.NUMBER)
+        #date = cursor.var(cx_Oracle.STRING)
+        #rake1 = cursor.var(cx_Oracle.NUMBER)
+        #rake2 = cursor.var(cx_Oracle.NUMBER)
+        #dist = cursor.var(cx_Oracle.NUMBER)
+        #az = cursor.var(cx_Oracle.NUMBER)
+        #elev = cursor.var(cx_Oracle.NUMBER)
+        #place = cursor.var(cx_Oracle.STRING)
+        #direction = cursor.var(cx_Oracle.STRING)
+        try:
+            cursor.execute(query, {'evid': eventid})
+        except psycopg2.DatabaseError as err:
+            logger.warn('Error: %s' % err)
+            cursor.close()
+            con.close()
+            break
+        try:
+            [(lat,lon,mag,depth,date,rake1,rake2,dist,az,town,place)] = cursor.fetchall()
+        except psycopg2.ProgrammingError as err:
+            logger.warn('Error: %s' % err)
+            cursor.close()
+            con.close()
+            break
+
+        cursor.close()
+        con.close()
+        success = True
+        break
+    if not success:
+        logger.warning('Could not retrieve event from database(s)')
+        return None
+
+#    try:
+#        dt = datetime.strptime(date.getvalue(), constants.TIMEFMT)
+#    except ValueError:
+#        try:
+#            dt = datetime.strptime(date.getvalue(), constants.ALT_TIMEFMT)
+#        except ValueError:
+#            logger.error("Can't parse input time %s" % event['time'])
+#            return
+
+    dt = datetime.strptime(date, '%Y/%m/%d %H:%M:%S.%f')
+    date = dt.strftime(constants.TIMEFMT) # changed source of TIMEFMT to proper local library - GG
+    dt = datetime.strptime(date, constants.TIMEFMT)
+
+    distmi = float(dist) * 0.62137
+
+    mech = 'ALL'
+    if rake1 is not None and rake2 is not None:  # RAKE VALUES ARE NOT ALWAYS PRESENT FOR EVENTS, DEFAULTING TO-> mech = 'ALL' - GG
+        rake1 = float(rake1)
+        rake2 = float(rake2)
+        if rake1 > 180:
+            rake1 -= 360
+        if rake2 > 180:
+            rake2 -= 360
+        if rake1 < -180:
+            rake1 += 360
+        if rake2 < -180:
+            rake2 += 360
+
+        if rake1 >= -135 and rake1 <= -45 and rake2 >= -135 and rake2 <= -45:
+            mech = 'NM'  # Normal
+        elif (rake1 >= -135 and rake1 <= -45) or (rake2 >= -135 and rake2 <= -45):
+            mech = 'NM'  # Oblique Normal
+        elif rake1 >= 45 and rake1 <= 135 and rake2 >= 45 and rake2 <= 135:
+            mech = 'RS'  # Reverse
+        elif (rake1 >= 45 and rake1 <= 135) or (rake2 >= 45 and rake2 <= 135):
+            mech = 'RS'  # Oblique Reverse
+        elif rake1 >= -45 and rake1 <= 45 and \
+            ((rake2 >= 135 and rake2 <= 225) or
+                (rake2 >= -225 and rake2 <= -135)):
+            mech = 'SS'
+        elif rake2 >= -45 and rake2 <= 45 and \
+            ((rake1 >= 135 and rake1 <= 225) or
+                (rake1 >= -225 and rake1 <= -135)):
+            mech = 'SS'
+
+    loc = place
+
+    event = {'id': eventid,
+             'netid': config['netid'],
+             'network': config['network'],
+             'lat': round(float(lat), 5),
+             'lon': round(float(lon), 5),
+             'depth': round(float(depth), 1),
+             'mag': round(float(mag), 1),
+             'time': dt,
+             'locstring': loc,
+             'mech': mech,
+             'alt_eventids': "NONE"}  # ADDED alt_eventids key because sm_queue is expecting and attempts to access this dict value - GG
+
+    return event
+
+def _get_eqinfo_oracle(eventid, config, logger):
+    """Get a dictionary of event information for the given eventid.
+
+    Args:
+        eventid (str): The event ID.
+        config (dict): The AQMS configuration dictionary.
+        logger (logger): The logger for this process.
+
+    Returns:
+        dict: A dictionary containing the following keys:
+
+            - 'id' (str, "9108645")
+            - 'netid' (str, 'ci')
+            - 'network' (str, 'Southern California Seismic Network'')
+            - lat (float)
+            - lon (float)
+            - depth (float)
+            - mag (float)
+            - time (datetime object)
+            - locstring (str)
+            - mech (str)
+    """
+    success = False
+    for dbname in sorted(config['dbs'].keys()):
         db = config['dbs'][dbname]
         dsn_tns = cx_Oracle.makedsn(db['host'], db['port'],
                                     sid=db['sid'])

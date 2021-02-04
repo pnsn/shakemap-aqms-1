@@ -29,7 +29,7 @@ class AQMSDb2XMLModule(CoreModule):
 
         Raises:
             NotADirectoryError: When the event data directory does not exist.
-            FileNotFoundError: When the the shake_result HDF file does not
+            FileNotFoundError: When the event.xml file does not
                 exist.
         """
         install_path, data_path = get_config_paths()
