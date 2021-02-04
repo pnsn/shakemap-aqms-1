@@ -118,10 +118,9 @@ def main(pargs):
     with get_context(context, pargs.attached):
         logger = get_logger(logpath, pargs.attached)
         #
-        # Create/retrieve the database for aftershock suppression
+        # Always create/retrieve the database for aftershock suppression
         #
-        if aftershockThreshold > 0:  # aftershock flag is set, load the DB
-            aftershockDBobj = aftershockDB(install_path)            
+        aftershockDBobj = aftershockDB(install_path)            
         #
         # Create the socket
         #
