@@ -290,8 +290,8 @@ def _get_eqinfo_postgres(eventid, config, logger):
                  TrueTime.getStringf(o.datetime),
                  m.rake1, m.rake2, 
                  wheres.point('town',o.lat,o.lon,o.depth),
-                 wheres.locale_by_type2(o.lat,o.lon,o.depth,'town'),
-                 FROM netmag n, origin o, event e, 
+                 wheres.locale_by_type2(o.lat,o.lon,o.depth,'town') 
+                 FROM netmag n, origin o, event e 
                  LEFT OUTER JOIN mec m ON e.prefmec = m.mecid 
                  WHERE e.evid = %(evid)s  
                  AND e.selectflag = 1 
