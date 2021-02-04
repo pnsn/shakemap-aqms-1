@@ -295,7 +295,7 @@ class AQMSDb2XMLModule(CoreModule):
                      ORDER BY a.net, a.sta, a.seedchan, a.location, 
                      a.amptype, a.lddate desc 
                      ) 
-                     SELECT UNIQUE net, sta, seedchan, location, 
+                     SELECT DISTINCT net, sta, seedchan, location, 
                      amplitude, amptype, cflag, quality, units 
                      FROM q1 
                      ORDER BY net, sta, seedchan, location, amptype"""
