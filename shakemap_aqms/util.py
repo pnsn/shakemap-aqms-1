@@ -251,7 +251,7 @@ def get_eqinfo(eventid, config, logger):
     """Get a dictionary of event information for the given eventid.
 
     Args:
-        eventid (str): The event ID.
+        eventid (str): The AQMS event ID.
         config (dict): The AQMS configuration dictionary.
         logger (logger): The logger for this process.
 

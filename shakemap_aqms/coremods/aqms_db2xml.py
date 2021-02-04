@@ -47,6 +47,11 @@ class AQMSDb2XMLModule(CoreModule):
             raise FileNotFoundError('%s does not exist.' % datafile)
 
         origin = Origin.fromFile(datafile)
+        if origin['netid'].lower() in self._eventid:
+            # strip off the netid so the event ID can be found in AQMS db
+            aqms_eventid = self._eventid[2:]
+        else:
+            aqms_eventid = self._eventid
 
         config = get_aqms_config()
 
@@ -306,7 +311,7 @@ class AQMSDb2XMLModule(CoreModule):
                 query = pg_query
 
             try:
-                cursor.execute(query, {'evid': self._eventid})
+                cursor.execute(query, {'evid': aqms_eventid})
             except Exception as err:
                 self.logger.warn('Error: amp query failed: %s' % err)
                 # try next dbname
@@ -406,6 +411,6 @@ class AQMSDb2XMLModule(CoreModule):
                 dataframe_to_xml(qm2[dbmax]['df'], xmlfile)
                 files_written += 1
         if files_written == 0:
-            self.logger.warn("No data found for event %s" % self._eventid)
+            self.logger.warn("No data found for event %s (aqms: %s)" % (self._eventid,aqms_eventid))
 
         return

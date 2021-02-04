@@ -188,7 +188,9 @@ def main(pargs):
 
                 # check if event is in aftershock zone and needs suppression
                 logger.info('Event mag is %f' % event.get('mag'))
+                # construct NEIC eventID (prefix with netcode)
                 eventID = event.get("netid") + str(event.get("id"))
+                event['id'] = eventID
                 emaglimit = float(queue_conf['emaglimit'])
                 logger.info('emaglimit configuration set to %f' % emaglimit)
                 aftershockDict = {"lat": event.get('lat'), "lon": event.get('lon'), "eventID": eventID, "mag": event.get('mag'), "emaglimit": emaglimit}
