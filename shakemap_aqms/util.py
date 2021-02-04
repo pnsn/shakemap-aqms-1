@@ -9,6 +9,10 @@ from datetime import datetime
 # Third party imports
 import cx_Oracle
 import pandas as pd
+try:
+    import psycopg2
+except Exception as e:
+    print("postgresql not enabled")
 import numpy as np
 from lxml import etree
 from configobj import ConfigObj
