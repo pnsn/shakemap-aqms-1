@@ -41,7 +41,6 @@ def get_connection(db_config, logger):
         except cx_Oracle.DatabaseError as err:
             logger.warn('Error connecting to database: %s' % dsn_tns)
             logger.warn('Error: %s' % err)
-            continue
 
     elif db_config['driver'] == "postgres":
 
@@ -57,7 +56,6 @@ def get_connection(db_config, logger):
         except psycopg2.DatabaseError as err:
             logger.warn('Error connecting to database: %s on %s' % (db_config['sid'],db_config['host']))
             logger.warn('Error: %s' % err)
-            continue
 
     else:
         raise ValueError('unknown driver %s (only postgres or oracle allowed)'
