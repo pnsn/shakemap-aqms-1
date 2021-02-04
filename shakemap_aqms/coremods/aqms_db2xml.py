@@ -57,7 +57,7 @@ class AQMSDb2XMLModule(CoreModule):
             db = config['dbs'][dbname]
             try:
                 # get_connection needs db['driver'] to be "oracle" or "postgres"
-                con = get_connection(db, logger)
+                con = get_connection(db, self.logger)
             except Exception as err:
                 self.logger.warn('Error connecting to database: %s' % dbname)
                 self.logger.warn('Error: %s' % err)
@@ -235,7 +235,7 @@ class AQMSDb2XMLModule(CoreModule):
             db = config['dbs'][dbname]
             
             try:
-                con = get_connection(db, logger)
+                con = get_connection(db, self.logger)
             except Exception as err:
                 self.logger.warn('Error connecting to database: %s' % dbname)
                 self.logger.warn('Error: %s' % err)
