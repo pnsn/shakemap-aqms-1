@@ -77,8 +77,12 @@ class NotificationModule(CoreModule):
             else:
                 cmd = config['notify'][action_name]['command']
 
-            # replace with the AQMS event ID
-            cmd = cmd.replace("<EVENT>",aqms_eventid)
+            # find out if you need to replace with the AQMS event ID
+            if config['notify'][action_name]['use_aqms_id']:
+                cmd = cmd.replace("<EVENT>",aqms_eventid)
+            else:
+                cmd = cmd.replace("<EVENT>",self._eventid)
+
             cmd = cmd.split()
             
             try:
